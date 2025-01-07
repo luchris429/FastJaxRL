@@ -25,8 +25,6 @@ from wrappers import (
     ClipAction,
 )
 
-
-
 class ActorCritic(nn.Module):
     action_dim: Sequence[int]
     activation: nn.Module  # a callable Flax module or any function you like
@@ -443,7 +441,7 @@ if __name__ == "__main__":
     succesful_count = 0
     failed_count = 0
     best = []  # Changed to store (activation_fn, best_score, scores)
-    #Set up base population
+    # Set up base population
     population = {}
     base_dir = "base_activations"
     for filename in os.listdir(base_dir):

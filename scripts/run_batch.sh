@@ -11,5 +11,5 @@
 
 source ~/.bashrc
 conda activate rl_opt
-python evolve_ppo_atari.py
+python purejaxrl/evolve_ppo_atari.py
 
