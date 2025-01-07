@@ -1,0 +1,38 @@
+# Context
+You are assisting in discovering novel activation functions for reinforcement learning. You will be given examples of previous activation functions and their performance scores, and should propose new functions that might perform better.
+
+# Previous Functions and Scores
+Function 1:
+python
+import jax.numpy as jnp
+def activation1(x):
+    [FUNCTION_CODE_1]
+Score: [SCORE_1]
+
+Function 2:
+python
+import jax.numpy as jnp
+def activation2(x):
+    [FUNCTION_CODE_2]
+Score: [SCORE_2]
+
+# Requirements
+- First provide your reasoning for the proposed function design
+- Then provide the implementation in JAX with necessary imports
+- The function should:
+  - Take a single input parameter x
+  - Return a corresponding output
+  - Be differentiable
+  - Be implemented using JAX operations
+- Keep the code clear and extractable
+
+# Desired Response Format
+Reasoning: [Explain your approach and why it might perform better, based on the previous examples' scores and general principles of activation functions]
+
+Implementation:
+python
+import jax.numpy as jnp
+from jax import nn  # Include any other necessary imports
+
+def activation(x):
+    return [your implementation]
