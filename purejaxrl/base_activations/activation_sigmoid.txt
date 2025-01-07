@@ -1,0 +1,20 @@
+@partial(jax.jit, inline=True)
+def sigmoid(x: ArrayLike) -> Array:
+  r"""Sigmoid activation function.
+
+  Computes the element-wise function:
+
+  .. math::
+    \mathrm{sigmoid}(x) = \frac{1}{1 + e^{-x}}
+
+  Args:
+    x : input array
+
+  Returns:
+    An array.
+
+  See also:
+    :func:`log_sigmoid`
+
+  """
+  return lax.logistic(x)

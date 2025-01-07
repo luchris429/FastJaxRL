@@ -7,7 +7,10 @@ purejaxrl/phase_results/
 purejaxrl/BestPlots/
 
 # Generated text files
-purejaxrl/*.txt
+purejaxrl/failed_activations.txt
+purejaxrl/temp_activations.txt
+purejaxrl/temp_activation.py
+purejaxrl/best.txt
 
 # SLURM output files
 purejaxrl/slurm-*
@@ -15,7 +18,6 @@ purejaxrl/slurm-*
 # Experiment outputs
 purejaxrl/*_activations/
 purejaxrl/*_activation*/
-!purejaxrl/base_activations/    # Explicitly keep this directory
 purejaxrl/training_return*/
 purejaxrl/scores_activati*/
 purejaxrl/failed_activatio*/
@@ -25,6 +27,7 @@ purejaxrl/temp_activatio*/
 !purejaxrl/dqn.py
 !purejaxrl/ppo.py
 !purejaxrl/wrappers.py
+!purejaxrl/base_activations*/
 
 # Batch scripts (optional, uncomment if you want to ignore them)
 # purejaxrl/*.sh

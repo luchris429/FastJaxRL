@@ -1,0 +1,22 @@
+@jax.jit
+def mish(x: ArrayLike) -> Array:
+  r"""Mish activation function.
+
+  Computes the element-wise function:
+
+  .. math::
+    \mathrm{mish}(x) = x \cdot \mathrm{tanh}(\mathrm{softplus}(x))
+
+  For more information, see
+  `Mish: A Self Regularized Non-Monotonic Activation Function
+  <https://arxiv.org/abs/1908.08681>`_.
+
+  Args:
+    x : input array
+
+  Returns:
+    An array.
+  """
+  numpy_util.check_arraylike("mish", x)
+  x_arr = jnp.asarray(x)
+  return x_arr * jnp.tanh(softplus(x_arr))

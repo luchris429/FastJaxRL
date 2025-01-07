@@ -1,0 +1,16 @@
+@jax.jit
+def tanh(x: ArrayLike) -> Array:
+    r"""Hyperbolic tangent activation function.
+
+    Computes the element-wise function:
+
+    .. math::
+        \mathrm{tanh}(x) = \frac{\sinh(x)}{\cosh(x)} = \frac{e^x - e^{-x}}{e^x + e^{-x}}
+
+    Args:
+        x : input array
+
+    Returns:
+        An array.
+    """
+    return jnp.tanh(x)

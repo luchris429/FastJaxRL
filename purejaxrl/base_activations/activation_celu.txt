@@ -1,0 +1,24 @@
+@jax.jit
+def celu(x: ArrayLike, alpha: ArrayLike = 1.0) -> Array:
+  r"""Continuously-differentiable exponential linear unit activation.
+
+  Computes the element-wise function:
+
+  .. math::
+    \mathrm{celu}(x) = \begin{cases}
+      x, & x > 0\\
+      \alpha \left(\exp(\frac{x}{\alpha}) - 1\right), & x \le 0
+    \end{cases}
+
+  For more information, see
+  `Continuously Differentiable Exponential Linear Units
+  <https://arxiv.org/abs/1704.07483>`_.
+
+  Args:
+    x : input array
+    alpha : array or scalar (default: 1.0)
+
+  Returns:
+    An array.
+  """
+  return jnp.maximum(x, 0.0) + alpha * jnp.expm1(jnp.minimum(x, 0.0) / alpha)
