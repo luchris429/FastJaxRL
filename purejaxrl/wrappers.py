@@ -8,7 +8,6 @@ from typing import Optional, Tuple, Union, Any
 from gymnax.environments import environment, spaces
 from brax import envs
 from brax.envs.wrappers.training import EpisodeWrapper, AutoResetWrapper
-import navix as nx
 
 
 class GymnaxWrapper(object):
@@ -145,45 +144,6 @@ class BraxGymnaxWrapper:
             shape=(self._env.action_size,),
         )
 
-class NavixGymnaxWrapper:
-    def __init__(self, env_name):
-        self._env = nx.make(env_name)
-
-    def reset(self, key, params=None):
-        timestep = self._env.reset(key)
-        return timestep.observation, timestep
-
-    def step(self, key, state, action, params=None):
-        timestep = self._env.step(state, action)
-        return timestep.observation, timestep, timestep.reward, timestep.is_done(), {}
-
-    def observation_space(self, params):
-        return spaces.Box(
-            low=self._env.observation_space.minimum,
-            high=self._env.observation_space.maximum,
-            shape=(np.prod(self._env.observation_space.shape),),
-            dtype=self._env.observation_space.dtype,
-        )
-
-    def action_space(self, params):
-        return spaces.Discrete(
-            num_categories=self._env.action_space.maximum.item() + 1,
-        )
-
-
-class ClipAction(GymnaxWrapper):
-    def __init__(self, env, low=-1.0, high=1.0):
-        super().__init__(env)
-        self.low = low
-        self.high = high
-
-    def step(self, key, state, action, params=None):
-        """TODO: In theory the below line should be the way to do this."""
-        # action = jnp.clip(action, self.env.action_space.low, self.env.action_space.high)
-        action = jnp.clip(action, self.low, self.high)
-        return self._env.step(key, state, action, params)
-
-
 class TransformObservation(GymnaxWrapper):
     def __init__(self, env, transform_obs):
         super().__init__(env)
@@ -196,6 +156,18 @@ class TransformObservation(GymnaxWrapper):
     def step(self, key, state, action, params=None):
         obs, state, reward, done, info = self._env.step(key, state, action, params)
         return self.transform_obs(obs), state, reward, done, info
+    
+class ClipAction(GymnaxWrapper):
+    def __init__(self, env, low=-1.0, high=1.0):
+        super().__init__(env)
+        self.low = low
+        self.high = high
+
+    def step(self, key, state, action, params=None):
+        """TODO: In theory the below line should be the way to do this."""
+        # action = jnp.clip(action, self.env.action_space.low, self.env.action_space.high)
+        action = jnp.clip(action, self.low, self.high)
+        return self._env.step(key, state, action, params)
 
 
 class TransformReward(GymnaxWrapper):

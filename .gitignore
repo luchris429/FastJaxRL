@@ -1,2 +1,33 @@
-*.py[co]
-__pycache__/
+# Python cache files
+purejaxrl/__pycache__/
+purejaxrl/*.py[cod]
+
+# Result directories
+purejaxrl/phase_results/
+purejaxrl/BestPlots/
+
+# Generated text files
+purejaxrl/*.txt
+
+# SLURM output files
+purejaxrl/slurm-*
+
+# Experiment outputs
+purejaxrl/*_activations/
+purejaxrl/*_activation*/
+!purejaxrl/base_activations/    # Explicitly keep this directory
+purejaxrl/training_return*/
+purejaxrl/scores_activati*/
+purejaxrl/failed_activatio*/
+purejaxrl/temp_activatio*/
+
+# Keep source files
+!purejaxrl/dqn.py
+!purejaxrl/ppo.py
+!purejaxrl/wrappers.py
+
+# Batch scripts (optional, uncomment if you want to ignore them)
+# purejaxrl/*.sh
+
+# Weights & Biases
+wandb/

@@ -2,9 +2,10 @@
 PureJaxRL version of CleanRL's DQN: https://github.com/vwxyzjn/cleanrl/blob/master/cleanrl/dqn_jax.py
 """
 import os
+from importlib import import_module
 import jax
 import jax.numpy as jnp
-
+import google.generativeai as genai
 import chex
 import flax
 import wandb
@@ -14,17 +15,28 @@ from flax.training.train_state import TrainState
 from gymnax.wrappers.purerl import FlattenObservationWrapper, LogWrapper
 import gymnax
 import flashbax as fbx
+import time
+import os
+import inspect
+import random
+import re
+import jax
+import matplotlib.pyplot as plt
+jax.config.update("jax_enable_x64", True)
+os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+
 
 
 class QNetwork(nn.Module):
     action_dim: int
-
+    activation: nn.Module  # a callable Flax module or any function you like
+    
     @nn.compact
     def __call__(self, x: jnp.ndarray):
         x = nn.Dense(120)(x)
-        x = nn.relu(x)
+        x = self.activation(x)  # use the injected activation instead of nn.relu
         x = nn.Dense(84)(x)
-        x = nn.relu(x)
+        x = self.activation(x)
         x = nn.Dense(self.action_dim)(x)
         return x
 
@@ -43,7 +55,7 @@ class CustomTrainState(TrainState):
     n_updates: int
 
 
-def make_train(config):
+def make_train(config, activation_fn):
 
     config["NUM_UPDATES"] = config["TOTAL_TIMESTEPS"] // config["NUM_ENVS"]
 
@@ -86,7 +98,10 @@ def make_train(config):
         buffer_state = buffer.init(_timestep)
 
         # INIT NETWORK AND OPTIMIZER
-        network = QNetwork(action_dim=env.action_space(env_params).n)
+        network = QNetwork(
+            action_dim=env.action_space(env_params).n,
+            activation=activation_fn,  # pass the activation you want to test
+        )
         rng, _rng = jax.random.split(rng)
         init_x = jnp.zeros(env.observation_space(env_params).shape)
         network_params = network.init(_rng, init_x)
@@ -247,9 +262,107 @@ def make_train(config):
 
     return train
 
+def get_function(function_name, module_name):
+    # Remove module from sys.modules if it exists
+    import sys
+    if module_name in sys.modules:
+        del sys.modules[module_name]
+    
+    # Remove pycache files
+    import shutil
+    pycache_dir = "__pycache__"
+    if os.path.exists(pycache_dir):
+        shutil.rmtree(pycache_dir)
+    
+    # Remove .pyc file if it exists
+    pyc_file = f"{module_name}.pyc"
+    if os.path.exists(pyc_file):
+        os.remove(pyc_file)
+        
+    module = import_module(module_name)  # Now reimport the fresh module
+    return getattr(module, function_name)
 
+def run_experiment(config, activation_fn):
+    # Add imports before writing the activation function
+    imports = open("base_activations/base_imports.txt", "r").read()
+    fn_name = "custom_activation"
+    temp_activation = rename_function(activation_fn, fn_name)
+    with open("temp_activation.py", "w") as f:
+        f.write(imports + '\n\n' + temp_activation)
+    try:
+        custom_activation = get_function(fn_name, "temp_activation")
+        rng = jax.random.PRNGKey(config["SEED"])
+        rngs = jax.random.split(rng, config["NUM_SEEDS"])
+        train_vjit = jax.jit(jax.vmap(make_train(config, custom_activation)))
+        outs = train_vjit(rngs)
+        avg_score_over_seeds = outs["metrics"]['returns'].mean(axis=0)
+        total_score = avg_score_over_seeds.sum()
+    except Exception as e:
+        with open("failed_activations.log", "a") as f:
+            f.write(f"\nFailed Activation Function:\n{activation_fn}\n\nException:\n{str(e)}\n\n")
+        total_score = - 100000000
+        avg_score_over_seeds = -1
+
+    return total_score, avg_score_over_seeds
+
+def gen_crossover(act1, act2, score1, score2):
+    act1, act2 = rename_function(act1, "activation1"), rename_function(act2, "activation2")
+    model = genai.GenerativeModel("gemini-1.5-flash")
+    with open("prompt_activation.txt", "r") as file:
+        prompt = file.read()
+    prompt = prompt.replace("[FUNCTION_CODE_1]", act1)
+    prompt = prompt.replace("[FUNCTION_CODE_2]", act2)
+    prompt = prompt.replace("[SCORE_1]", str(score1))
+    prompt = prompt.replace("[SCORE_2]", str(score2))
+    response = model.generate_content(prompt)
+    parsed_response = response.text.split("```python")[1].split("```")[0]
+    return parsed_response
+
+def rename_function(function_str, function_name):
+    # Extract original function name using regex
+    match = re.search(r'def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(', function_str)
+    if not match:
+        return function_str
+    original_name = match.group(1)
+    
+    # Replace all occurrences of original name with new name, ensuring exact match with word boundaries
+    pattern = r'\b' + re.escape(original_name) + r'\b'
+    return re.sub(pattern, function_name, function_str)
+
+def get_pair(population):
+    activation1, activation2 = random.sample(list(population.keys()), 2)
+    score1, score2 = population[activation1], population[activation2]
+    return activation1, activation2, score1, score2
+
+def plot_scores(best_list, filename):
+    plt.figure(figsize=(12, 6))
+    for idx, (_, score, scores) in enumerate(best_list):
+        plt.plot(scores, label=f'Best {idx+1}')
+    
+    plt.xlabel('Steps')
+    plt.ylabel('Average Return')
+    plt.title('Performance of Best Activation Functions')
+    plt.legend()
+    os.makedirs("BestPlots", exist_ok=True)
+    plt.savefig(f"BestPlots/{filename}.png")
+    
+    # Log plot to wandb
+    wandb.log({
+        "activation_performance": wandb.Image(plt)
+    })
+    
+    plt.close()
+
+# For processing
 def main():
 
+
+    best_score_so_far = -100000000
+    best_activation_so_far = ""
+    succesful_count = 0
+    failed_count = 0
+
+    genai.configure(api_key="AIzaSyAuTt22urZ-jow0KqRuMZxUpVI8SFsb9LU")
     config = {
         "NUM_ENVS": 10,
         "BUFFER_SIZE": 10000,
@@ -267,17 +380,104 @@ def main():
         "TAU": 1.0,
         "ENV_NAME": "Breakout-MinAtar",
         "SEED": 0,
-        "NUM_SEEDS": 1,
+        "NUM_SEEDS": 32,
         "WANDB_MODE": "disabled",  # set to online to activate wandb
         "ENTITY": "",
         "PROJECT": "",
     }
+    wandb.init(
+            project='Evolving_RL',
+            entity='playing_around',
+            name=config['ENV_NAME'] + '_actv_evo',
+            mode='disabled'
+        )
+    best = []  # Changed to store (activation_fn, best_score, scores)
+    #Set up base population
+    population = {}
+    base_dir = "base_activations"
+    for filename in os.listdir(base_dir):
+        if filename.startswith("activation_"):
+            print(filename)
+            activation_path = os.path.join(base_dir, filename)
+            with open(activation_path, "r") as f:
+                activation_fn = f.read()
+            population[activation_fn], scores = run_experiment(config, activation_fn)
+            print(population[activation_fn])
+            if population[activation_fn] == -100000000:
+                del population[activation_fn]
+                failed_count += 1
+            else:
+                succesful_count += 1
+            if activation_fn in population and population[activation_fn] > best_score_so_far:
+                best_score_so_far = population[activation_fn]
+                best_activation_so_far = activation_fn
+                best.append((activation_fn, best_score_so_far, scores))
+                plot_scores(best, "evolution_progress")
 
-    rng = jax.random.PRNGKey(config["SEED"])
-    rngs = jax.random.split(rng, config["NUM_SEEDS"])
-    train_vjit = jax.jit(jax.vmap(make_train(config)))
-    outs = jax.block_until_ready(train_vjit(rngs))
+                print(f"New best activation: {best_activation_so_far} with score {best_score_so_far}")
+                wandb.log({
+                    "best_score": best_score_so_far,
+                    "step": succesful_count
+                })
+    print(f"Base population size: {len(population)}")
+    exit()
+    #Execute evolution
+    NUM_PHASES = 10
+    NUM_PROMPTS = 20
+    NUM_TO_KEEP = 10
+    NUM_SAMPLES = 5
+    for phase in range(NUM_PHASES):
+        wandb.log({
+            "phase": phase,
+            "succesful_count": succesful_count,
+            "failed_count": failed_count
+        })
+        # Sample 10 pairs with replacement
+        pairs = []
+        for _ in range(NUM_PROMPTS):
+            activation1, activation2, score1, score2 = get_pair(population)
+            pairs.append(gen_crossover(activation1, activation2, score1, score2))
+        for pair in pairs:
+            i = 0
+            while i < NUM_SAMPLES:
+                activation = gen_crossover(pair[0], pair[1], pair[2], pair[3])
+                population[activation], scores = run_experiment(config, activation)
+                if population[activation] == -100000000:
+                    del population[activation]
+                    failed_count += 1
+                else:
+                    if population[activation] > best_score_so_far:
+                        best_score_so_far = population[activation]
+                        best_activation_so_far = activation
+                        best.append((activation, best_score_so_far, scores))
+                        plot_scores(best, "evolution_progress")
+                        print(f"New best activation: {best_activation_so_far} with score {best_score_so_far}")
+                        wandb.log({
+                            "best_score": best_score_so_far,
+                            "step": succesful_count
+                        })
+                i += 1
+                succesful_count += 1
+        
+        #Sort population
+        population = dict(sorted(population.items(), key=lambda item: item[1], reverse=True))
+        #Keep top 10
+        population = dict(list(population.items())[:NUM_TO_KEEP])
+        print(f"Phase {phase} complete")
+        #Store population in text file
+        os.makedirs("phase_results", exist_ok=True)
+        with open(f"phase_results/phase_{phase}.txt", "w") as f:
+            for activation, score in population.items():
+                f.write("Activation:\n")
+                f.write(activation)
+                f.write(f"Score: {score}\n")
+                f.write("\n\n")
 
+    with open("best.txt", "w") as f:
+        for activation, score in best:
+            f.write(f"Activation: {activation}\n")
+            f.write(f"Score: {score}\n")
+            f.write("\n\n")
 
 if __name__ == "__main__":
     main()
