@@ -301,7 +301,7 @@ def evaluate_continuous(config, activation_fn):
         total, scores = run_experiment_continuous(config_copy, activation_fn)
         if env_name not in best_scores_all_envs:
             best_scores_all_envs[env_name] = []
-        best_scores_all_envs[env_name].append(scores)
+        best_scores_all_envs[env_name].append((activation_fn, total, scores))
         plot_scores(best_scores_all_envs[env_name], f"test_{env_name}_train_{config['ENV_NAME']}")
 
 def get_function(function_name, module_name):
