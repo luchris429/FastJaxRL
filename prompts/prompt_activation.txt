@@ -1,0 +1,47 @@
+# Context 
+You are tasked with discovering novel activation functions for reinforcement learning (RL) to improve performance in RL tasks. Based on previous activation functions and their associated performance scores, propose a new activation function that has the potential to outperform them.  
+
+# Previous Activation Functions and Scores
+Function 1:  
+```python  
+[FUNCTION_CODE_1]  
+Score: [SCORE_1]  
+```  
+
+Function 2:  
+```python  
+[FUNCTION_CODE_2]  
+Score: [SCORE_2]  
+```  
+
+# Requirements
+- First provide your reasoning for the proposed function design
+- Then provide the implementation in JAX with necessary imports
+- The function should:
+  - Take a single input parameter x
+  - If any other parameters are needed, specify default values as well.
+  - Return a corresponding output
+  - Be differentiable
+  - Be implemented using JAX operations
+- Keep the code clear and extractable 
+- Name the function as `activation` only.
+
+# Response Format
+Reasoning:
+<Explain your approach and why it might perform better, based on the previous examples' scores and general principles of activation functions.>  
+
+Implementation: 
+```python  
+import jax.numpy as jnp  
+from jax import nn  # Include other imports as needed  
+
+def activation(x):  
+    """  
+    <Short description of the function>  
+    Args:  
+        x: Input scalar or tensor.  
+    Returns:  
+        Output after applying the activation function.  
+    """  
+    return <your_implementation_code>
+```  

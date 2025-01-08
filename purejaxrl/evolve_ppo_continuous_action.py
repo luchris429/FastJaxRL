@@ -14,6 +14,7 @@ import random
 import matplotlib.pyplot as plt
 from importlib import import_module
 import google.generativeai as genai
+import copy
 
 os.environ['XLA_PYTHON_CLIENT_PREALLOCATE']='false'
 from wrappers import (
@@ -326,13 +327,13 @@ def get_function(function_name, module_name):
 
 def run_experiment_continuous(config, activation_fn):
     # Add imports before writing the activation function
-    imports = open("base_activations/base_imports.txt", "r").read()
+    imports = open("../base_activations/base_imports.txt", "r").read()
     fn_name = "custom_activation"
     temp_activation = rename_function(activation_fn, fn_name)
     with open("temp_activation.py", "w") as f:
         f.write(imports + '\n\n' + temp_activation)
     try:
-        custom_activation = get_function(fn_name, "temp_activation")
+        custom_activation = get_function(fn_name, ".temp_activation")
         rng = jax.random.PRNGKey(config["SEED"])
         rngs = jax.random.split(rng, config["NUM_SEEDS"])
         train_vjit = jax.jit(jax.vmap(make_train(config, custom_activation)))
@@ -341,18 +342,21 @@ def run_experiment_continuous(config, activation_fn):
         total_score = avg_score_over_seeds.sum()
         avg_score_over_seeds = avg_score_over_seeds.mean(-1).reshape(-1)
     except Exception as e:
-        with open("failed_activations.log", "a") as f:
+        with open(f"{log_dir}/failed_activations.log", "a") as f:
             f.write(f"\nFailed Activation Function:\n{activation_fn}\n\nException:\n{str(e)}\n\n")
         total_score = -100000000
         avg_score_over_seeds = -1
 
     return total_score, avg_score_over_seeds
 
+with open("../prompts/prompt_activation.txt", "r") as file:
+    prompt_crossover = file.read()
+
 def gen_crossover(act1, act2, score1, score2):
     act1, act2 = rename_function(act1, "activation1"), rename_function(act2, "activation2")
     model = genai.GenerativeModel("gemini-1.5-flash")
-    with open("prompt_activation.txt", "r") as file:
-        prompt = file.read()
+    
+    prompt = copy.deepcopy(prompt_crossover)
     prompt = prompt.replace("[FUNCTION_CODE_1]", act1)
     prompt = prompt.replace("[FUNCTION_CODE_2]", act2)
     prompt = prompt.replace("[SCORE_1]", str(score1))
@@ -397,7 +401,7 @@ def plot_scores(best_list, filename):
     plt.close()
 
 if __name__ == "__main__":
-    genai.configure(api_key="AIzaSyAuTt22urZ-jow0KqRuMZxUpVI8SFsb9LU")
+    genai.configure(api_key="AIzaSyCeswUfUoqXKEVAkkzy-njTsGiYIikIDts")
     config = {
         "LR": 3e-4,
         "NUM_ENVS": 2048,
@@ -428,6 +432,8 @@ if __name__ == "__main__":
         name='short' + config['ENV_NAME'] + '_actv_evo',
         mode=config['WANDB_MODE']
     )
+    log_dir = f"../exps/{config['ENV_NAME']}"
+    os.makedirs(log_dir, exist_ok=True)
     # import time
     # start = time.time()
     # rng = jax.random.PRNGKey(30)
@@ -443,7 +449,7 @@ if __name__ == "__main__":
     best = []  # Changed to store (activation_fn, best_score, scores)
     # Set up base population
     population = {}
-    base_dir = "base_activations"
+    base_dir = "../base_activations"
     for filename in os.listdir(base_dir):
         if filename.startswith("activation_"):
             print(filename)
@@ -516,16 +522,16 @@ if __name__ == "__main__":
         #Keep top 10
         population = dict(list(population.items())[:NUM_TO_KEEP])
         print(f"Phase {phase} complete")
-        #Store population in text file
-        os.makedirs("phase_results", exist_ok=True)
-        with open(f"phase_results/phase_{phase}.txt", "w") as f:
+        # use the log directory to store the results
+        os.makedirs(f'{log_dir}/phase_results', exist_ok=True)
+        with open(f'{log_dir}/phase_results/phase_{phase}.txt', "w") as f:
             for activation, score in population.items():
                 f.write("Activation:\n")
                 f.write(activation)
                 f.write(f"Score: {score}\n")
                 f.write("\n\n")
 
-    with open("best.txt", "w") as f:
+    with open(f'{log_dir}/best_activation.txt', "w") as f:
         for activation, score in best:
             f.write(f"Activation: {activation}\n")
             f.write(f"Score: {score}\n")

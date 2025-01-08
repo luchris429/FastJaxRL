@@ -34,3 +34,5 @@ purejaxrl/temp_activatio*/
 
 # Weights & Biases
 wandb/
+*.out
+*.ipynb
